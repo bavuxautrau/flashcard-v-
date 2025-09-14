@@ -21,11 +21,13 @@ th, td { border:1px solid #333; padding:5px 10px; text-align:center;}
 
 <h1>Web Học Từ Vựng IPA + SM-2</h1>
 
+<!-- Flashcard -->
 <div class="flashcard" id="flashcard">
   <div class="front" id="front">Click để lật</div>
   <div class="back" id="back"></div>
 </div>
 
+<!-- Các nút chức năng -->
 <div>
   <input type="text" id="newWord" placeholder="Từ tiếng Anh">
   <input type="text" id="newMeaning" placeholder="Nghĩa tiếng Việt">
@@ -36,10 +38,12 @@ th, td { border:1px solid #333; padding:5px 10px; text-align:center;}
   <button onclick="reviewKnown()">Ôn lại từ đã thuộc</button>
   <button onclick="playPronunciation()">Phát âm</button>
   <button id="speakBtn">🎤 Nói từ này</button>
+  <button onclick="requestNotificationPermission()">🔔 Bật thông báo</button>
 </div>
 
 <p id="resultPronounce"></p>
 
+<!-- Bảng danh sách từ -->
 <h3>Danh sách từ (Sửa/Xóa)</h3>
 <select id="filterCategory" onchange="renderTable()">
   <option value="">Tất cả danh mục</option>
@@ -95,12 +99,6 @@ async function showWord() {
   back.innerHTML = `${word.vi} <div class="phonetic">[${word.phonetic}]</div>`;
   localStorage.setItem('words', JSON.stringify(words));
   flashcard.classList.remove("flipped");
-
-  // Nhắc nhở ôn tập
-  let nextReviewTime = word.lastReview + word.interval*24*60*60*1000;
-  if(nextReviewTime <= Date.now() && !inReviewMode){
-    alert("Bạn nên ôn từ: " + word.eng);
-  }
 }
 
 flashcard.addEventListener("click", ()=>{ flashcard.classList.toggle("flipped"); });
@@ -159,6 +157,29 @@ speakBtn.addEventListener("click", ()=>{
 });
 
 // ==========================
+// Thông báo (Notification API)
+// ==========================
+function requestNotificationPermission() {
+  Notification.requestPermission().then(permission => {
+    if (permission === "granted") {
+      alert("✅ Bạn đã bật thông báo!");
+    } else {
+      alert("❌ Bạn không cho phép thông báo!");
+    }
+  });
+}
+
+function scheduleNotifications(word){
+  if(Notification.permission !== "granted") return;
+  let times = [5*60*1000, 20*60*1000, 40*60*1000, 2*60*60*1000, 10*60*60*1000, 24*60*60*1000]; 
+  times.forEach((t)=>{
+    setTimeout(()=>{
+      new Notification("Ôn từ vựng", { body: `Hãy ôn lại từ: ${word.eng} (${word.vi})` });
+    }, t);
+  });
+}
+
+// ==========================
 // Lấy IPA từ DictionaryAPI
 // ==========================
 async function fetchIPA(word){
@@ -167,17 +188,13 @@ async function fetchIPA(word){
     let data = await res.json();
     if(data[0] && data[0].phonetics && data[0].phonetics.length>0){
       for(let p of data[0].phonetics){
-        if(p.text) return p.text; // ví dụ ˈæp(ə)l
+        if(p.text) return p.text; 
       }
     }
     return generateFakeIPA(word);
   } catch(e){ console.log(e); return generateFakeIPA(word); }
 }
-
-// Tạm thời tạo IPA giả
-function generateFakeIPA(word){
-  return word.toLowerCase().split("").join(".");
-}
+function generateFakeIPA(word){ return word.toLowerCase().split("").join("."); }
 
 // ==========================
 // Thêm/Sửa/Xóa từ
@@ -224,6 +241,10 @@ function markKnown(){
   word.lastReview=Date.now();
   word.interval = nextInterval(word.interval);
   localStorage.setItem('words', JSON.stringify(words));
+  
+  // 🔔 Lên lịch thông báo ôn tập
+  scheduleNotifications(word);
+
   inReviewMode=false; showWord(); renderTable();
 }
 
