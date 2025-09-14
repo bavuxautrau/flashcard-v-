@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Web Học Từ Vựng IPA + SM-2</title>
+<style>
+body { font-family: Arial, sans-serif; background:#f0f8ff; display:flex; flex-direction:column; align-items:center; padding:20px;}
+h1 { color:#333; }
+.flashcard { width:350px; height:200px; border:2px solid #333; border-radius:10px; display:flex; justify-content:center; align-items:center; text-align:center; background-color:#fff; margin:20px; font-size:24px; cursor:pointer; transition: transform 0.6s; transform-style: preserve-3d; perspective:1000px; position:relative;}
+.flashcard.flipped { transform: rotateY(180deg);}
+.front, .back { position:absolute; width:320px; height:180px; backface-visibility:hidden; display:flex; flex-direction:column; justify-content:center; align-items:center; border-radius:10px; padding:10px;}
+.back { transform: rotateY(180deg); background-color:#ffe4e1;}
+input, button, select { margin:5px; padding:5px; font-size:16px;}
+table { border-collapse: collapse; margin-top:10px; max-width:90%;}
+th, td { border:1px solid #333; padding:5px 10px; text-align:center;}
+.phonetic { font-size:16px; margin-top:5px; color:#555;}
+#resultPronounce { margin-top:10px; font-weight:bold; color:#006400; }
+</style>
+</head>
+<body>
+
+<h1>Web Học Từ Vựng IPA + SM-2</h1>
+
+<div class="flashcard" id="flashcard">
+  <div class="front" id="front">Click để lật</div>
+  <div class="back" id="back"></div>
+</div>
+
+<div>
+  <input type="text" id="newWord" placeholder="Từ tiếng Anh">
+  <input type="text" id="newMeaning" placeholder="Nghĩa tiếng Việt">
+  <input type="text" id="newCategory" placeholder="Danh mục (tự nhập)">
+  <button onclick="addWord()">Thêm từ mới</button>
+  <button onclick="nextWord()">Từ tiếp theo</button>
+  <button onclick="markKnown()">Đã thuộc</button>
+  <button onclick="reviewKnown()">Ôn lại từ đã thuộc</button>
+  <button onclick="playPronunciation()">Phát âm</button>
+  <button id="speakBtn">🎤 Nói từ này</button>
+</div>
+
+<p id="resultPronounce"></p>
+
+<h3>Danh sách từ (Sửa/Xóa)</h3>
+<select id="filterCategory" onchange="renderTable()">
+  <option value="">Tất cả danh mục</option>
+</select>
+<table id="wordTable">
+  <thead>
+    <tr><th>Từ</th><th>Nghĩa</th><th>Danh mục</th><th>Đã thuộc</th><th>Hành động</th></tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+// ==========================
+// Dữ liệu từ vựng
+// ==========================
+let words = JSON.parse(localStorage.getItem('words')) || [
+  {eng:"apple", vi:"quả táo", category:"Đồ ăn", known:false, lastReview:Date.now(), interval:1, phonetic:"ˈæp(ə)l"},
+  {eng:"cat", vi:"con mèo", category:"Động vật", known:false, lastReview:Date.now(), interval:1, phonetic:"kæt"}
+];
+let currentIndex = 0;
+let inReviewMode = false;
+
+// ==========================
+// DOM elements
+// ==========================
+const flashcard = document.getElementById("flashcard");
+const front = document.getElementById("front");
+const back = document.getElementById("back");
+const wordTable = document.querySelector("#wordTable tbody");
+const filterCategory = document.getElementById("filterCategory");
+const speakBtn = document.getElementById("speakBtn");
+const resultPronounce = document.getElementById("resultPronounce");
+
+// ==========================
+// Flashcard
+// ==========================
+async function showWord() {
+  let activeWords = inReviewMode ? words.filter(w=>w.known) : words.filter(w=>!w.known);
+  if(filterCategory.value) activeWords = activeWords.filter(w=>w.category===filterCategory.value);
+  if(activeWords.length===0){
+    front.textContent = inReviewMode?"Chưa có từ để ôn!":"Bạn đã học hết từ mới!";
+    back.innerHTML = "";
+    return;
+  }
+  currentIndex = currentIndex % activeWords.length;
+  let word = activeWords[currentIndex];
+
+  front.textContent = word.eng;
+
+  // Lấy IPA thực nếu chưa có
+  if(!word.phonetic) word.phonetic = await fetchIPA(word.eng);
+
+  back.innerHTML = `${word.vi} <div class="phonetic">[${word.phonetic}]</div>`;
+  localStorage.setItem('words', JSON.stringify(words));
+  flashcard.classList.remove("flipped");
+
+  // Nhắc nhở ôn tập
+  let nextReviewTime = word.lastReview + word.interval*24*60*60*1000;
+  if(nextReviewTime <= Date.now() && !inReviewMode){
+    alert("Bạn nên ôn từ: " + word.eng);
+  }
+}
+
+flashcard.addEventListener("click", ()=>{ flashcard.classList.toggle("flipped"); });
+function nextWord(){ currentIndex++; showWord(); }
+
+// ==========================
+// Phát âm
+// ==========================
+function playPronunciation(){
+  let activeWords = inReviewMode ? words.filter(w=>w.known) : words.filter(w=>!w.known);
+  if(filterCategory.value) activeWords = activeWords.filter(w=>w.category===filterCategory.value);
+  if(activeWords.length===0) return;
+  const utterance = new SpeechSynthesisUtterance(activeWords[currentIndex].eng);
+  utterance.lang = 'en-US';
+  utterance.rate = 0.9;
+  speechSynthesis.speak(utterance);
+}
+
+// ==========================
+// Luyện phát âm bằng micro
+// ==========================
+let recognition;
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.lang = "en-US"; // giọng Mỹ
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.onresult = (event) => {
+    let spokenText = event.results[0][0].transcript.trim().toLowerCase();
+    let activeWords = inReviewMode ? words.filter(w=>w.known) : words.filter(w=>!w.known);
+    if(filterCategory.value) activeWords = activeWords.filter(w=>w.category===filterCategory.value);
+    if(activeWords.length===0) return;
+    let correctWord = activeWords[currentIndex].eng.toLowerCase();
+    if (spokenText === correctWord) {
+      resultPronounce.textContent = `✅ Chuẩn rồi: ${spokenText}`;
+      setTimeout(()=>{ nextWord(); }, 1000);
+    } else {
+      resultPronounce.textContent = `❌ Bạn nói: "${spokenText}", cần: "${correctWord}"`;
+    }
+  };
+
+  recognition.onerror = (event) => {
+    resultPronounce.textContent = "⚠ Lỗi nhận diện giọng nói: " + event.error;
+  };
+} else {
+  resultPronounce.textContent = "Trình duyệt không hỗ trợ nhận diện giọng nói!";
+}
+
+speakBtn.addEventListener("click", ()=>{
+  if(recognition) {
+    resultPronounce.textContent = "🎤 Đang nghe...";
+    recognition.start();
+  }
+});
+
+// ==========================
+// Lấy IPA từ DictionaryAPI
+// ==========================
+async function fetchIPA(word){
+  try {
+    let res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+    let data = await res.json();
+    if(data[0] && data[0].phonetics && data[0].phonetics.length>0){
+      for(let p of data[0].phonetics){
+        if(p.text) return p.text; // ví dụ ˈæp(ə)l
+      }
+    }
+    return generateFakeIPA(word);
+  } catch(e){ console.log(e); return generateFakeIPA(word); }
+}
+
+// Tạm thời tạo IPA giả
+function generateFakeIPA(word){
+  return word.toLowerCase().split("").join(".");
+}
+
+// ==========================
+// Thêm/Sửa/Xóa từ
+// ==========================
+function addWord(){
+  const eng = document.getElementById("newWord").value.trim();
+  const vi = document.getElementById("newMeaning").value.trim() || eng;
+  const category = document.getElementById("newCategory").value.trim() || "Khác";
+  if(!eng) return alert("Vui lòng nhập từ tiếng Anh!");
+  let now = Date.now();
+  words.push({eng, vi, category, known:false, lastReview:now, interval:1, phonetic:""});
+  localStorage.setItem('words', JSON.stringify(words));
+  document.getElementById("newWord").value=""; document.getElementById("newMeaning").value=""; document.getElementById("newCategory").value="";
+  updateCategoryOptions(); inReviewMode=false; showWord(); renderTable();
+}
+
+function editWord(index){
+  let word = words[index];
+  let newEng = prompt("Sửa từ tiếng Anh:", word.eng);
+  if(!newEng) return;
+  let newVi = prompt("Sửa nghĩa tiếng Việt:", word.vi) || newEng;
+  let newCategory = prompt("Sửa danh mục:", word.category) || "Khác";
+  word.eng=newEng; word.vi=newVi; word.category=newCategory; word.phonetic="";
+  localStorage.setItem('words', JSON.stringify(words));
+  updateCategoryOptions(); renderTable(); showWord();
+}
+
+function deleteWord(index){
+  if(!confirm("Bạn có chắc muốn xóa từ này?")) return;
+  words.splice(index,1);
+  localStorage.setItem('words', JSON.stringify(words));
+  updateCategoryOptions(); renderTable(); showWord();
+}
+
+// ==========================
+// SM-2 & Đánh dấu đã thuộc
+// ==========================
+function markKnown(){
+  let activeWords = words.filter(w=>!w.known);
+  if(filterCategory.value) activeWords = activeWords.filter(w=>w.category===filterCategory.value);
+  if(activeWords.length===0) return;
+  let word = activeWords[currentIndex];
+  word.known=true;
+  word.lastReview=Date.now();
+  word.interval = nextInterval(word.interval);
+  localStorage.setItem('words', JSON.stringify(words));
+  inReviewMode=false; showWord(); renderTable();
+}
+
+function nextInterval(prev){
+  if(prev<3) return 3;
+  if(prev<7) return 7;
+  if(prev<14) return 14;
+  if(prev<30) return 30;
+  return 30;
+}
+
+// ==========================
+// Ôn lại từ đã thuộc
+// ==========================
+function reviewKnown(){
+  let knownWords = words.filter(w=>w.known);
+  if(filterCategory.value) knownWords = knownWords.filter(w=>w.category===filterCategory.value);
+  if(knownWords.length===0) return alert("Chưa có từ nào để ôn!");
+  inReviewMode=true; currentIndex=0; showWord();
+}
+
+// ==========================
+// Danh sách từ
+// ==========================
+function renderTable(){
+  wordTable.innerHTML="";
+  const selectedCat = filterCategory.value;
+  words.forEach((w,i)=>{
+    if(selectedCat && w.category!==selectedCat) return;
+    let tr = document.createElement("tr");
+    tr.innerHTML = `<td>${w.eng}</td><td>${w.vi}</td><td>${w.category}</td><td>${w.known?"✔":"❌"}</td>
+    <td><button onclick="editWord(${i})">Sửa</button> <button onclick="deleteWord(${i})">Xóa</button></td>`;
+    wordTable.appendChild(tr);
+  });
+}
+
+// ==========================
+// Cập nhật danh mục
+// ==========================
+function updateCategoryOptions(){
+  let categories = [...new Set(words.map(w=>w.category))];
+  filterCategory.innerHTML='<option value="">Tất cả danh mục</option>';
+  categories.forEach(cat=>{
+    let option = document.createElement("option");
+    option.value=cat; option.textContent=cat;
+    filterCategory.appendChild(option);
+  });
+}
+
+// ==========================
+// Khởi tạo
+// ==========================
+updateCategoryOptions();
+showWord();
+renderTable();
+</script>
+</body>
+</html>
