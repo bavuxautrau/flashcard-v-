@@ -36,6 +36,7 @@ th, td { border:1px solid #333; padding:5px 10px; text-align:center;}
   <button onclick="nextWord()">Từ tiếp theo</button>
   <button onclick="markKnown()">Đã thuộc</button>
   <button onclick="reviewKnown()">Ôn lại từ đã thuộc</button>
+  <button onclick="reviewUnknown()">Học từ chưa thuộc</button>
   <button onclick="playPronunciation()">Phát âm</button>
   <button id="speakBtn">🎤 Nói từ này</button>
   <button onclick="requestNotificationPermission()">🔔 Bật thông báo</button>
@@ -56,19 +57,13 @@ th, td { border:1px solid #333; padding:5px 10px; text-align:center;}
 </table>
 
 <script>
-// ==========================
-// Dữ liệu từ vựng
-// ==========================
 let words = JSON.parse(localStorage.getItem('words')) || [
   {eng:"apple", vi:"quả táo", category:"Đồ ăn", known:false, lastReview:Date.now(), interval:1, phonetic:"ˈæp(ə)l"},
   {eng:"cat", vi:"con mèo", category:"Động vật", known:false, lastReview:Date.now(), interval:1, phonetic:"kæt"}
 ];
 let currentIndex = 0;
-let inReviewMode = false;
+let mode = "unknown"; // "unknown" = học từ chưa thuộc, "known" = ôn lại từ đã thuộc
 
-// ==========================
-// DOM elements
-// ==========================
 const flashcard = document.getElementById("flashcard");
 const front = document.getElementById("front");
 const back = document.getElementById("back");
@@ -81,21 +76,17 @@ const resultPronounce = document.getElementById("resultPronounce");
 // Flashcard
 // ==========================
 async function showWord() {
-  let activeWords = inReviewMode ? words.filter(w=>w.known) : words.filter(w=>!w.known);
+  let activeWords = mode==="known" ? words.filter(w=>w.known) : words.filter(w=>!w.known);
   if(filterCategory.value) activeWords = activeWords.filter(w=>w.category===filterCategory.value);
   if(activeWords.length===0){
-    front.textContent = inReviewMode?"Chưa có từ để ôn!":"Bạn đã học hết từ mới!";
+    front.textContent = mode==="known"?"Chưa có từ để ôn!":"Bạn đã học hết từ mới!";
     back.innerHTML = "";
     return;
   }
   currentIndex = currentIndex % activeWords.length;
   let word = activeWords[currentIndex];
-
   front.textContent = word.eng;
-
-  // Lấy IPA thực nếu chưa có
   if(!word.phonetic) word.phonetic = await fetchIPA(word.eng);
-
   back.innerHTML = `${word.vi} <div class="phonetic">[${word.phonetic}]</div>`;
   localStorage.setItem('words', JSON.stringify(words));
   flashcard.classList.remove("flipped");
@@ -108,7 +99,7 @@ function nextWord(){ currentIndex++; showWord(); }
 // Phát âm
 // ==========================
 function playPronunciation(){
-  let activeWords = inReviewMode ? words.filter(w=>w.known) : words.filter(w=>!w.known);
+  let activeWords = mode==="known" ? words.filter(w=>w.known) : words.filter(w=>!w.known);
   if(filterCategory.value) activeWords = activeWords.filter(w=>w.category===filterCategory.value);
   if(activeWords.length===0) return;
   const utterance = new SpeechSynthesisUtterance(activeWords[currentIndex].eng);
@@ -118,19 +109,18 @@ function playPronunciation(){
 }
 
 // ==========================
-// Luyện phát âm bằng micro
+// Nhận diện giọng nói
 // ==========================
 let recognition;
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   recognition = new SpeechRecognition();
-  recognition.lang = "en-US"; // giọng Mỹ
+  recognition.lang = "en-US";
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
-
   recognition.onresult = (event) => {
     let spokenText = event.results[0][0].transcript.trim().toLowerCase();
-    let activeWords = inReviewMode ? words.filter(w=>w.known) : words.filter(w=>!w.known);
+    let activeWords = mode==="known" ? words.filter(w=>w.known) : words.filter(w=>!w.known);
     if(filterCategory.value) activeWords = activeWords.filter(w=>w.category===filterCategory.value);
     if(activeWords.length===0) return;
     let correctWord = activeWords[currentIndex].eng.toLowerCase();
@@ -141,14 +131,10 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       resultPronounce.textContent = `❌ Bạn nói: "${spokenText}", cần: "${correctWord}"`;
     }
   };
-
   recognition.onerror = (event) => {
     resultPronounce.textContent = "⚠ Lỗi nhận diện giọng nói: " + event.error;
   };
-} else {
-  resultPronounce.textContent = "Trình duyệt không hỗ trợ nhận diện giọng nói!";
 }
-
 speakBtn.addEventListener("click", ()=>{
   if(recognition) {
     resultPronounce.textContent = "🎤 Đang nghe...";
@@ -157,47 +143,39 @@ speakBtn.addEventListener("click", ()=>{
 });
 
 // ==========================
-// Thông báo (Notification API)
+// Thông báo
 // ==========================
 function requestNotificationPermission() {
   Notification.requestPermission().then(permission => {
-    if (permission === "granted") {
-      alert("✅ Bạn đã bật thông báo!");
-    } else {
-      alert("❌ Bạn không cho phép thông báo!");
-    }
+    if (permission === "granted") alert("✅ Bạn đã bật thông báo!");
+    else alert("❌ Bạn không cho phép thông báo!");
   });
 }
-
 function scheduleNotifications(word){
   if(Notification.permission !== "granted") return;
-  let times = [5*60*1000, 20*60*1000, 40*60*1000, 2*60*60*1000, 10*60*60*1000, 24*60*60*1000]; 
+  let times = [5*60*1000, 20*60*1000, 40*60*1000];
   times.forEach((t)=>{
-    setTimeout(()=>{
-      new Notification("Ôn từ vựng", { body: `Hãy ôn lại từ: ${word.eng} (${word.vi})` });
-    }, t);
+    setTimeout(()=>{ new Notification("Ôn từ vựng", { body: `Hãy ôn lại từ: ${word.eng} (${word.vi})` }); }, t);
   });
 }
 
 // ==========================
-// Lấy IPA từ DictionaryAPI
+// Lấy IPA
 // ==========================
 async function fetchIPA(word){
   try {
     let res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
     let data = await res.json();
     if(data[0] && data[0].phonetics && data[0].phonetics.length>0){
-      for(let p of data[0].phonetics){
-        if(p.text) return p.text; 
-      }
+      for(let p of data[0].phonetics){ if(p.text) return p.text; }
     }
     return generateFakeIPA(word);
-  } catch(e){ console.log(e); return generateFakeIPA(word); }
+  } catch(e){ return generateFakeIPA(word); }
 }
 function generateFakeIPA(word){ return word.toLowerCase().split("").join("."); }
 
 // ==========================
-// Thêm/Sửa/Xóa từ
+// Quản lý từ
 // ==========================
 function addWord(){
   const eng = document.getElementById("newWord").value.trim();
@@ -207,30 +185,30 @@ function addWord(){
   let now = Date.now();
   words.push({eng, vi, category, known:false, lastReview:now, interval:1, phonetic:""});
   localStorage.setItem('words', JSON.stringify(words));
-  document.getElementById("newWord").value=""; document.getElementById("newMeaning").value=""; document.getElementById("newCategory").value="";
-  updateCategoryOptions(); inReviewMode=false; showWord(); renderTable();
+  document.getElementById("newWord").value=""; 
+  document.getElementById("newMeaning").value=""; 
+  document.getElementById("newCategory").value="";
+  updateCategoryOptions(); mode="unknown"; showWord(); renderTable();
 }
-
-function editWord(index){
-  let word = words[index];
-  let newEng = prompt("Sửa từ tiếng Anh:", word.eng);
+function editWord(i){
+  let w = words[i];
+  let newEng = prompt("Sửa từ:", w.eng);
   if(!newEng) return;
-  let newVi = prompt("Sửa nghĩa tiếng Việt:", word.vi) || newEng;
-  let newCategory = prompt("Sửa danh mục:", word.category) || "Khác";
-  word.eng=newEng; word.vi=newVi; word.category=newCategory; word.phonetic="";
+  let newVi = prompt("Sửa nghĩa:", w.vi) || newEng;
+  let newCategory = prompt("Sửa danh mục:", w.category) || "Khác";
+  w.eng=newEng; w.vi=newVi; w.category=newCategory; w.phonetic="";
   localStorage.setItem('words', JSON.stringify(words));
   updateCategoryOptions(); renderTable(); showWord();
 }
-
-function deleteWord(index){
-  if(!confirm("Bạn có chắc muốn xóa từ này?")) return;
-  words.splice(index,1);
+function deleteWord(i){
+  if(!confirm("Xóa từ này?")) return;
+  words.splice(i,1);
   localStorage.setItem('words', JSON.stringify(words));
   updateCategoryOptions(); renderTable(); showWord();
 }
 
 // ==========================
-// SM-2 & Đánh dấu đã thuộc
+// Đánh dấu đã thuộc
 // ==========================
 function markKnown(){
   let activeWords = words.filter(w=>!w.known);
@@ -239,35 +217,19 @@ function markKnown(){
   let word = activeWords[currentIndex];
   word.known=true;
   word.lastReview=Date.now();
-  word.interval = nextInterval(word.interval);
   localStorage.setItem('words', JSON.stringify(words));
-  
-  // 🔔 Lên lịch thông báo ôn tập
   scheduleNotifications(word);
-
-  inReviewMode=false; showWord(); renderTable();
-}
-
-function nextInterval(prev){
-  if(prev<3) return 3;
-  if(prev<7) return 7;
-  if(prev<14) return 14;
-  if(prev<30) return 30;
-  return 30;
+  mode="unknown"; showWord(); renderTable();
 }
 
 // ==========================
-// Ôn lại từ đã thuộc
+// Chế độ học
 // ==========================
-function reviewKnown(){
-  let knownWords = words.filter(w=>w.known);
-  if(filterCategory.value) knownWords = knownWords.filter(w=>w.category===filterCategory.value);
-  if(knownWords.length===0) return alert("Chưa có từ nào để ôn!");
-  inReviewMode=true; currentIndex=0; showWord();
-}
+function reviewKnown(){ mode="known"; currentIndex=0; showWord(); }
+function reviewUnknown(){ mode="unknown"; currentIndex=0; showWord(); }
 
 // ==========================
-// Danh sách từ
+// Bảng từ
 // ==========================
 function renderTable(){
   wordTable.innerHTML="";
@@ -280,22 +242,16 @@ function renderTable(){
     wordTable.appendChild(tr);
   });
 }
-
-// ==========================
-// Cập nhật danh mục
-// ==========================
 function updateCategoryOptions(){
   let categories = [...new Set(words.map(w=>w.category))];
   filterCategory.innerHTML='<option value="">Tất cả danh mục</option>';
   categories.forEach(cat=>{
-    let option = document.createElement("option");
-    option.value=cat; option.textContent=cat;
-    filterCategory.appendChild(option);
+    let opt = document.createElement("option");
+    opt.value=cat; opt.textContent=cat;
+    filterCategory.appendChild(opt);
   });
 }
 
-// ==========================
-// Khởi tạo
 // ==========================
 updateCategoryOptions();
 showWord();
