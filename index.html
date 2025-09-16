@@ -2,257 +2,400 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Web Học Từ Vựng IPA + SM-2</title>
+<title>Web Học Từ Vựng IPA + SM-2 + Ảnh URL</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-body { font-family: Arial, sans-serif; background:#f0f8ff; display:flex; flex-direction:column; align-items:center; padding:20px;}
-h1 { color:#333; }
-.flashcard { width:350px; height:200px; border:2px solid #333; border-radius:10px; display:flex; justify-content:center; align-items:center; text-align:center; background-color:#fff; margin:20px; font-size:24px; cursor:pointer; transition: transform 0.6s; transform-style: preserve-3d; perspective:1000px; position:relative;}
-.flashcard.flipped { transform: rotateY(180deg);}
-.front, .back { position:absolute; width:320px; height:180px; backface-visibility:hidden; display:flex; flex-direction:column; justify-content:center; align-items:center; border-radius:10px; padding:10px;}
-.back { transform: rotateY(180deg); background-color:#ffe4e1;}
-input, button, select { margin:5px; padding:5px; font-size:16px;}
-table { border-collapse: collapse; margin-top:10px; max-width:90%;}
-th, td { border:1px solid #333; padding:5px 10px; text-align:center;}
-.phonetic { font-size:16px; margin-top:5px; color:#555;}
-#resultPronounce { margin-top:10px; font-weight:bold; color:#006400; }
+body { font-family: Arial, sans-serif; background:#f0f8ff; display:flex; flex-direction:column; align-items:center; padding:18px; }
+h1 { color:#333; margin:6px 0 14px 0; }
+.flashcard { width:360px; height:300px; border:2px solid #333; border-radius:10px; display:flex; justify-content:center; align-items:center; text-align:center; background-color:#fff; margin:12px; font-size:24px; cursor:pointer; transition: transform 0.6s; transform-style: preserve-3d; perspective:1000px; position:relative; }
+.flashcard.flipped { transform: rotateY(180deg); }
+.front, .back { position:absolute; width:320px; height:260px; backface-visibility:hidden; display:flex; flex-direction:column; justify-content:flex-start; align-items:center; border-radius:10px; padding:12px; box-sizing:border-box; overflow:auto; }
+.back { transform: rotateY(180deg); background-color:#fff6f2; }
+.phonetic { font-size:15px; margin-top:8px; color:#444; font-style:italic; }
+.flash-img { max-width:90%; max-height:140px; margin-top:10px; border-radius:8px; object-fit:cover; border:1px solid #ddd; }
+.controls, .inputs { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:8px 0; }
+.inputs input[type="text"] { padding:8px; font-size:15px; width:180px; border-radius:6px; border:1px solid #bbb; }
+button { padding:8px 10px; border-radius:6px; border:1px solid #888; background:#fff; cursor:pointer; }
+.small { padding:6px 8px; font-size:14px; }
+table { border-collapse: collapse; margin-top:10px; width:90%; max-width:960px; }
+th, td { border:1px solid #333; padding:6px 8px; text-align:center; font-size:14px; }
+.thumbnail { width:60px; height:40px; object-fit:cover; border-radius:4px; }
+#resultPronounce { margin-top:8px; font-weight:600; color:#006400; min-height:20px; }
+.note { font-size:13px; color:#666; margin-top:4px; }
 </style>
 </head>
 <body>
 
-<h1>Web Học Từ Vựng IPA + SM-2</h1>
+<h1>Web Học Từ Vựng IPA + SM-2 + Ảnh</h1>
 
 <!-- Flashcard -->
-<div class="flashcard" id="flashcard">
+<div class="flashcard" id="flashcard" title="Bấm để lật">
   <div class="front" id="front">Click để lật</div>
   <div class="back" id="back"></div>
 </div>
 
-<!-- Các nút chức năng -->
-<div>
-  <input type="text" id="newWord" placeholder="Từ tiếng Anh">
+<!-- Inputs: từ, nghĩa, danh mục, URL ảnh -->
+<div class="inputs">
+  <input type="text" id="newWord" placeholder="Từ tiếng Anh (vd: dog)">
   <input type="text" id="newMeaning" placeholder="Nghĩa tiếng Việt">
-  <input type="text" id="newCategory" placeholder="Danh mục (tự nhập)">
-  <button onclick="addWord()">Thêm từ mới</button>
-  <button onclick="nextWord()">Từ tiếp theo</button>
-  <button onclick="markKnown()">Đã thuộc</button>
-  <button onclick="reviewKnown()">Ôn lại từ đã thuộc</button>
-  <button onclick="reviewUnknown()">Học từ chưa thuộc</button>
-  <button onclick="playPronunciation()">Phát âm</button>
-  <button id="speakBtn">🎤 Nói từ này</button>
-  <button onclick="requestNotificationPermission()">🔔 Bật thông báo</button>
+  <input type="text" id="newCategory" placeholder="Danh mục (vd: động vật)">
+  <input type="text" id="newImage" placeholder="URL ảnh (tùy chọn)">
+</div>
+
+<div class="controls">
+  <button onclick="setUnsplashToInput()" class="small">🔀 Ảnh Unsplash (từ)</button>
+  <button onclick="addWord()">➕ Thêm từ mới</button>
+  <button onclick="nextWord()">⏭ Từ tiếp theo</button>
+  <button onclick="markKnown()">✅ Đã thuộc</button>
+  <button onclick="markUnknown()" class="small">❌ Chưa thuộc</button>
+  <button onclick="playPronunciation()" class="small">🔊 Phát âm</button>
+  <button id="speakBtn" class="small">🎤 Nói từ</button>
+  <button onclick="copyCurrentImageUrl()" class="small">📋 Sao chép URL ảnh hiện tại</button>
+  <button onclick="requestNotificationPermission()" class="small">🔔 Bật thông báo</button>
 </div>
 
 <p id="resultPronounce"></p>
+<p class="note">Ghi chú: nếu nhập URL ảnh, flashcard sẽ dùng ảnh đó; nếu để trống, ảnh tự động lấy từ Unsplash dựa trên từ.</p>
 
-<!-- Bảng danh sách từ -->
-<h3>Danh sách từ (Sửa/Xóa)</h3>
+<!-- Danh sách từ -->
+<h3>Danh sách từ (Sửa / Xóa / Ảnh)</h3>
 <select id="filterCategory" onchange="renderTable()">
   <option value="">Tất cả danh mục</option>
 </select>
 <table id="wordTable">
   <thead>
-    <tr><th>Từ</th><th>Nghĩa</th><th>Danh mục</th><th>Đã thuộc</th><th>Hành động</th></tr>
+    <tr><th>Từ</th><th>Nghĩa</th><th>Danh mục</th><th>Ảnh</th><th>Đã thuộc</th><th>Hành động</th></tr>
   </thead>
   <tbody></tbody>
 </table>
 
 <script>
+// ========== Dữ liệu ========== //
 let words = JSON.parse(localStorage.getItem('words')) || [
-  {eng:"apple", vi:"quả táo", category:"Đồ ăn", known:false, lastReview:Date.now(), interval:1, phonetic:"ˈæp(ə)l"},
-  {eng:"cat", vi:"con mèo", category:"Động vật", known:false, lastReview:Date.now(), interval:1, phonetic:"kæt"}
+  {eng:"apple", vi:"quả táo", category:"Đồ ăn", image:"", known:false, lastReview:Date.now(), interval:1, phonetic:"ˈæp(ə)l"},
+  {eng:"cat", vi:"con mèo", category:"Động vật", image:"", known:false, lastReview:Date.now(), interval:1, phonetic:"kæt"}
 ];
 let currentIndex = 0;
 let mode = "unknown"; // "unknown" = học từ chưa thuộc, "known" = ôn lại từ đã thuộc
 
-const flashcard = document.getElementById("flashcard");
-const front = document.getElementById("front");
-const back = document.getElementById("back");
-const wordTable = document.querySelector("#wordTable tbody");
-const filterCategory = document.getElementById("filterCategory");
-const speakBtn = document.getElementById("speakBtn");
-const resultPronounce = document.getElementById("resultPronounce");
+// ========== DOM ========== //
+const flashcard = document.getElementById('flashcard');
+const front = document.getElementById('front');
+const back = document.getElementById('back');
+const wordTable = document.querySelector('#wordTable tbody');
+const filterCategory = document.getElementById('filterCategory');
+const speakBtn = document.getElementById('speakBtn');
+const resultPronounce = document.getElementById('resultPronounce');
 
-// ==========================
-// Flashcard
-// ==========================
-async function showWord() {
-  let activeWords = mode==="known" ? words.filter(w=>w.known) : words.filter(w=>!w.known);
-  if(filterCategory.value) activeWords = activeWords.filter(w=>w.category===filterCategory.value);
-  if(activeWords.length===0){
-    front.textContent = mode==="known"?"Chưa có từ để ôn!":"Bạn đã học hết từ mới!";
+// ========== Flashcard show ========== //
+function getActiveWords(){
+  let list = (mode === "known") ? words.filter(w=>w.known) : words.filter(w=>!w.known);
+  if(filterCategory.value) list = list.filter(w => w.category === filterCategory.value);
+  return list;
+}
+
+async function showWord(){
+  const activeWords = getActiveWords();
+  if(activeWords.length === 0){
+    front.textContent = (mode==="known") ? "Chưa có từ để ôn!" : "Không có từ để học!";
     back.innerHTML = "";
     return;
   }
+  // ensure currentIndex in range
   currentIndex = currentIndex % activeWords.length;
-  let word = activeWords[currentIndex];
-  front.textContent = word.eng;
-  if(!word.phonetic) word.phonetic = await fetchIPA(word.eng);
-  back.innerHTML = `${word.vi} <div class="phonetic">[${word.phonetic}]</div>`;
+  const w = activeWords[currentIndex];
+
+  // set front
+  front.textContent = w.eng;
+
+  // fetch phonetic if empty
+  if(!w.phonetic) {
+    w.phonetic = await fetchIPA(w.eng);
+  }
+
+  // ensure image: if user provided image URL use it; else auto-unsplash
+  if(!w.image) {
+    w.image = getUnsplashUrl(w.eng);
+  }
+
+  // build back content (vi, ipa, image) — stable assignment so flipping doesn't clear
+  let imgHtml = '';
+  if(w.image){
+    // sanitize (simple) — set as-is; browser will block invalid urls.
+    imgHtml = `<img src="${w.image}" alt="${escapeHtml(w.eng)}" class="flash-img">`;
+  }
+  back.innerHTML = `
+    <div style="font-size:18px; font-weight:600; margin-top:6px;">${escapeHtml(w.vi)}</div>
+    <div class="phonetic">[${escapeHtml(w.phonetic)}]</div>
+    ${imgHtml}
+  `;
+
+  // persist
   localStorage.setItem('words', JSON.stringify(words));
-  flashcard.classList.remove("flipped");
+  flashcard.classList.remove('flipped');
 }
 
-flashcard.addEventListener("click", ()=>{ flashcard.classList.toggle("flipped"); });
+// safe minimal escape
+function escapeHtml(s){ if(!s) return ""; return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+// flip behavior
+flashcard.addEventListener('click', ()=> flashcard.classList.toggle('flipped'));
 function nextWord(){ currentIndex++; showWord(); }
 
-// ==========================
-// Phát âm
-// ==========================
+// ========== Speech Synthesis ========== //
 function playPronunciation(){
-  let activeWords = mode==="known" ? words.filter(w=>w.known) : words.filter(w=>!w.known);
-  if(filterCategory.value) activeWords = activeWords.filter(w=>w.category===filterCategory.value);
-  if(activeWords.length===0) return;
-  const utterance = new SpeechSynthesisUtterance(activeWords[currentIndex].eng);
-  utterance.lang = 'en-US';
-  utterance.rate = 0.9;
-  speechSynthesis.speak(utterance);
+  const activeWords = getActiveWords();
+  if(activeWords.length === 0) return;
+  const w = activeWords[currentIndex];
+  const u = new SpeechSynthesisUtterance(w.eng);
+  u.lang = 'en-US';
+  u.rate = 0.95;
+  speechSynthesis.speak(u);
 }
 
-// ==========================
-// Nhận diện giọng nói
-// ==========================
+// ========== Speech Recognition (kiểm tra phát âm) ========== //
 let recognition;
-if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SpeechRecognition();
-  recognition.lang = "en-US";
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.lang = 'en-US';
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
-  recognition.onresult = (event) => {
-    let spokenText = event.results[0][0].transcript.trim().toLowerCase();
-    let activeWords = mode==="known" ? words.filter(w=>w.known) : words.filter(w=>!w.known);
-    if(filterCategory.value) activeWords = activeWords.filter(w=>w.category===filterCategory.value);
-    if(activeWords.length===0) return;
-    let correctWord = activeWords[currentIndex].eng.toLowerCase();
-    if (spokenText === correctWord) {
-      resultPronounce.textContent = `✅ Chuẩn rồi: ${spokenText}`;
-      setTimeout(()=>{ nextWord(); }, 1000);
+
+  recognition.onresult = (ev) => {
+    const activeWords = getActiveWords();
+    if(activeWords.length === 0) return;
+    const spoken = ev.results[0][0].transcript.trim().toLowerCase();
+    const expected = activeWords[currentIndex].eng.trim().toLowerCase();
+    // normalize small punctuation
+    const normalize = s => s.replace(/[^a-z']/g,'').toLowerCase();
+    if(normalize(spoken) === normalize(expected)){
+      resultPronounce.textContent = `✅ Chuẩn rồi: ${spoken}`;
+      setTimeout(()=> nextWord(), 900);
     } else {
-      resultPronounce.textContent = `❌ Bạn nói: "${spokenText}", cần: "${correctWord}"`;
+      resultPronounce.textContent = `❌ Bạn nói: "${spoken}", cần: "${expected}"`;
     }
   };
-  recognition.onerror = (event) => {
-    resultPronounce.textContent = "⚠ Lỗi nhận diện giọng nói: " + event.error;
+
+  recognition.onerror = (ev) => {
+    resultPronounce.textContent = "⚠ Lỗi nhận diện giọng nói: " + (ev.error||'unknown');
   };
+} else {
+  resultPronounce.textContent = "Trình duyệt không hỗ trợ nhận diện giọng nói.";
 }
-speakBtn.addEventListener("click", ()=>{
-  if(recognition) {
+
+speakBtn.addEventListener('click', ()=> {
+  if(recognition){
     resultPronounce.textContent = "🎤 Đang nghe...";
     recognition.start();
+  } else {
+    resultPronounce.textContent = "⚠ Trình duyệt không hỗ trợ nhận diện giọng nói.";
   }
 });
 
-// ==========================
-// Thông báo
-// ==========================
-function requestNotificationPermission() {
-  Notification.requestPermission().then(permission => {
-    if (permission === "granted") alert("✅ Bạn đã bật thông báo!");
-    else alert("❌ Bạn không cho phép thông báo!");
+// ========== Notifications ========== //
+function requestNotificationPermission(){
+  if(!('Notification' in window)) { alert('Trình duyệt không hỗ trợ Notification API'); return; }
+  Notification.requestPermission().then(p=>{
+    alert(p === 'granted' ? '✅ Bạn đã bật thông báo!' : '❌ Bạn không cho phép thông báo!');
   });
 }
 function scheduleNotifications(word){
-  if(Notification.permission !== "granted") return;
-  let times = [5*60*1000, 20*60*1000, 40*60*1000];
-  times.forEach((t)=>{
-    setTimeout(()=>{ new Notification("Ôn từ vựng", { body: `Hãy ôn lại từ: ${word.eng} (${word.vi})` }); }, t);
+  if(Notification.permission !== 'granted') return;
+  const times = [5*60*1000, 20*60*1000, 40*60*1000, 2*60*60*1000, 10*60*60*1000, 24*60*60*1000];
+  times.forEach(t=>{
+    setTimeout(()=> new Notification('Ôn từ vựng', { body: `Hãy ôn lại từ: ${word.eng} — ${word.vi}` }), t);
   });
 }
 
-// ==========================
-// Lấy IPA
-// ==========================
+// ========== IPA fetch ========== //
 async function fetchIPA(word){
   try {
-    let res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
-    let data = await res.json();
-    if(data[0] && data[0].phonetics && data[0].phonetics.length>0){
-      for(let p of data[0].phonetics){ if(p.text) return p.text; }
+    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+    const data = await res.json();
+    if(Array.isArray(data) && data[0] && data[0].phonetics && data[0].phonetics.length){
+      const p = data[0].phonetics.find(x=>x.text);
+      if(p) return p.text;
     }
     return generateFakeIPA(word);
-  } catch(e){ return generateFakeIPA(word); }
+  } catch(e){
+    return generateFakeIPA(word);
+  }
 }
-function generateFakeIPA(word){ return word.toLowerCase().split("").join("."); }
+function generateFakeIPA(word){
+  return word.split('').join('.');
+}
 
-// ==========================
-// Quản lý từ
-// ==========================
+// ========== Ảnh: Unsplash helper ========== //
+function getUnsplashUrl(word){
+  // use signature to avoid caching same image when needed
+  return `https://source.unsplash.com/600x400/?${encodeURIComponent(word)}&sig=${Date.now()}`;
+}
+
+// ========== Clipboard helpers ========== //
+async function pasteImageUrl(){
+  if(!navigator.clipboard) { alert('Trình duyệt không hỗ trợ Clipboard API'); return; }
+  try {
+    const txt = await navigator.clipboard.readText();
+    document.getElementById('newImage').value = txt;
+  } catch(e){
+    alert('Không thể đọc clipboard: ' + e);
+  }
+}
+async function copyToClipboard(text){
+  if(!navigator.clipboard) { alert('Trình duyệt không hỗ trợ Clipboard API'); return; }
+  try { await navigator.clipboard.writeText(text); alert('Đã sao chép URL ảnh'); }
+  catch(e){ alert('Không thể sao chép: '+e); }
+}
+function copyCurrentImageUrl(){
+  const active = getActiveWords();
+  if(active.length===0){ alert('Không có ảnh'); return; }
+  const w = active[currentIndex];
+  if(!w || !w.image) { alert('Hiện tại không có URL ảnh để sao chép'); return; }
+  copyToClipboard(w.image);
+}
+
+// ========== Thêm / Sửa / Xóa từ ========== //
 function addWord(){
-  const eng = document.getElementById("newWord").value.trim();
-  const vi = document.getElementById("newMeaning").value.trim() || eng;
-  const category = document.getElementById("newCategory").value.trim() || "Khác";
-  if(!eng) return alert("Vui lòng nhập từ tiếng Anh!");
-  let now = Date.now();
-  words.push({eng, vi, category, known:false, lastReview:now, interval:1, phonetic:""});
+  const eng = document.getElementById('newWord').value.trim();
+  const vi = document.getElementById('newMeaning').value.trim() || eng;
+  const category = document.getElementById('newCategory').value.trim() || 'Khác';
+  const image = (document.getElementById('newImage').value || '').trim();
+  if(!eng){ alert('Vui lòng nhập từ tiếng Anh'); return; }
+  words.push({eng, vi, category, image, known:false, lastReview:Date.now(), interval:1, phonetic:""});
   localStorage.setItem('words', JSON.stringify(words));
-  document.getElementById("newWord").value=""; 
-  document.getElementById("newMeaning").value=""; 
-  document.getElementById("newCategory").value="";
-  updateCategoryOptions(); mode="unknown"; showWord(); renderTable();
+  // clear inputs
+  document.getElementById('newWord').value='';
+  document.getElementById('newMeaning').value='';
+  document.getElementById('newCategory').value='';
+  document.getElementById('newImage').value='';
+  updateCategoryOptions();
+  mode = 'unknown';
+  // show the newly added word (last added)
+  const active = getActiveWords();
+  const idx = active.findIndex(w => w.eng === eng && w.vi === vi);
+  if(idx >= 0) currentIndex = idx;
+  showWord();
+  renderTable();
 }
+
 function editWord(i){
-  let w = words[i];
-  let newEng = prompt("Sửa từ:", w.eng);
+  // edit from global words array index i
+  const w = words[i];
+  if(!w) return;
+  const newEng = prompt('Sửa từ (tiếng Anh):', w.eng);
   if(!newEng) return;
-  let newVi = prompt("Sửa nghĩa:", w.vi) || newEng;
-  let newCategory = prompt("Sửa danh mục:", w.category) || "Khác";
-  w.eng=newEng; w.vi=newVi; w.category=newCategory; w.phonetic="";
+  const newVi = prompt('Sửa nghĩa (tiếng Việt):', w.vi) || newEng;
+  const newCategory = prompt('Sửa danh mục:', w.category) || 'Khác';
+  const newImage = prompt('Sửa URL ảnh (để trống = auto Unsplash):', w.image || '') || '';
+  w.eng = newEng.trim();
+  w.vi = newVi.trim();
+  w.category = newCategory.trim();
+  w.image = newImage.trim();
+  w.phonetic = '';
   localStorage.setItem('words', JSON.stringify(words));
-  updateCategoryOptions(); renderTable(); showWord();
+  updateCategoryOptions();
+  renderTable();
+  showWord();
 }
+
 function deleteWord(i){
-  if(!confirm("Xóa từ này?")) return;
+  if(!confirm('Bạn có chắc muốn xóa từ này?')) return;
   words.splice(i,1);
   localStorage.setItem('words', JSON.stringify(words));
-  updateCategoryOptions(); renderTable(); showWord();
+  updateCategoryOptions();
+  renderTable();
+  // ensure current index valid
+  currentIndex = 0;
+  showWord();
 }
 
-// ==========================
-// Đánh dấu đã thuộc
-// ==========================
+// ========== Đánh dấu đã thuộc / chưa ========== //
 function markKnown(){
-  let activeWords = words.filter(w=>!w.known);
-  if(filterCategory.value) activeWords = activeWords.filter(w=>w.category===filterCategory.value);
-  if(activeWords.length===0) return;
-  let word = activeWords[currentIndex];
-  word.known=true;
-  word.lastReview=Date.now();
-  localStorage.setItem('words', JSON.stringify(words));
-  scheduleNotifications(word);
-  mode="unknown"; showWord(); renderTable();
+  const active = getActiveWords();
+  if(active.length === 0) return;
+  const w = active[currentIndex];
+  // find in global array and update
+  const idx = words.findIndex(x => x.eng === w.eng && x.vi === w.vi && x.category === w.category);
+  if(idx >= 0){ words[idx].known = true; words[idx].lastReview = Date.now(); localStorage.setItem('words', JSON.stringify(words)); scheduleNotifications(words[idx]); }
+  // stay in same mode or return to unknown mode
+  mode = 'unknown';
+  showWord();
+  renderTable();
+}
+function markUnknown(){
+  const active = getActiveWords();
+  if(active.length === 0) return;
+  const w = active[currentIndex];
+  const idx = words.findIndex(x => x.eng === w.eng && x.vi === w.vi && x.category === w.category);
+  if(idx >= 0){ words[idx].known = false; localStorage.setItem('words', JSON.stringify(words)); }
+  showWord();
+  renderTable();
 }
 
-// ==========================
-// Chế độ học
-// ==========================
-function reviewKnown(){ mode="known"; currentIndex=0; showWord(); }
-function reviewUnknown(){ mode="unknown"; currentIndex=0; showWord(); }
+// ========== Mode control ========== //
+function reviewKnown(){ mode = 'known'; currentIndex = 0; showWord(); }
+function reviewUnknown(){ mode = 'unknown'; currentIndex = 0; showWord(); }
 
-// ==========================
-// Bảng từ
-// ==========================
+// ========== Unsplash controls ========== //
+function setUnsplashToInput(){
+  const w = document.getElementById('newWord').value.trim();
+  if(!w){ alert('Nhập từ vào ô Từ tiếng Anh trước'); return; }
+  document.getElementById('newImage').value = getUnsplashUrl(w);
+}
+function changeUnsplashImage(){
+  const active = getActiveWords();
+  if(active.length === 0) return;
+  const w = active[currentIndex];
+  const idx = words.findIndex(x => x.eng === w.eng && x.vi === w.vi && x.category === w.category);
+  if(idx >= 0){
+    words[idx].image = getUnsplashUrl(w.eng);
+    localStorage.setItem('words', JSON.stringify(words));
+    showWord();
+    renderTable();
+  }
+}
+
+// ========== Table render & categories ========== //
 function renderTable(){
-  wordTable.innerHTML="";
-  const selectedCat = filterCategory.value;
-  words.forEach((w,i)=>{
-    if(selectedCat && w.category!==selectedCat) return;
-    let tr = document.createElement("tr");
-    tr.innerHTML = `<td>${w.eng}</td><td>${w.vi}</td><td>${w.category}</td><td>${w.known?"✔":"❌"}</td>
-    <td><button onclick="editWord(${i})">Sửa</button> <button onclick="deleteWord(${i})">Xóa</button></td>`;
+  wordTable.innerHTML = '';
+  const sel = filterCategory.value;
+  words.forEach((w,i) => {
+    if(sel && w.category !== sel) return;
+    const tr = document.createElement('tr');
+    const thumb = w.image ? `<img src="${w.image}" class="thumbnail" alt="thumb">` : '';
+    tr.innerHTML = `<td>${escapeHtml(w.eng)}</td>
+      <td>${escapeHtml(w.vi)}</td>
+      <td>${escapeHtml(w.category)}</td>
+      <td>${thumb || '—'}</td>
+      <td>${w.known ? '✔' : '❌'}</td>
+      <td>
+        <button onclick="editWord(${i})">Sửa</button>
+        <button onclick="deleteWord(${i})">Xóa</button>
+        <button onclick="setImageUrlPrompt(${i})">✏️ Ảnh</button>
+      </td>`;
     wordTable.appendChild(tr);
   });
 }
+function setImageUrlPrompt(i){
+  const w = words[i];
+  const newUrl = prompt('Nhập URL ảnh (để trống = tự động Unsplash):', w.image || '') || '';
+  w.image = newUrl.trim();
+  localStorage.setItem('words', JSON.stringify(words));
+  renderTable();
+  showWord();
+}
+
 function updateCategoryOptions(){
-  let categories = [...new Set(words.map(w=>w.category))];
-  filterCategory.innerHTML='<option value="">Tất cả danh mục</option>';
-  categories.forEach(cat=>{
-    let opt = document.createElement("option");
-    opt.value=cat; opt.textContent=cat;
+  const cats = [...new Set(words.map(w => w.category).filter(Boolean))];
+  filterCategory.innerHTML = '<option value="">Tất cả danh mục</option>';
+  cats.forEach(c => {
+    const opt = document.createElement('option'); opt.value = c; opt.textContent = c;
     filterCategory.appendChild(opt);
   });
 }
 
-// ==========================
+// ========== Init ========== //
 updateCategoryOptions();
 showWord();
 renderTable();
