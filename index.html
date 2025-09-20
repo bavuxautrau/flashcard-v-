@@ -22,6 +22,9 @@ th, td { border:1px solid #333; padding:6px 8px; text-align:center; font-size:14
 .thumbnail { width:60px; height:40px; object-fit:cover; border-radius:4px; }
 #resultPronounce { margin-top:8px; font-weight:600; color:#006400; min-height:20px; }
 .note { font-size:13px; color:#666; margin-top:4px; }
+.practice { margin-top:20px; width:90%; max-width:600px; background:#fff; padding:12px; border:1px solid #aaa; border-radius:8px; }
+.practice textarea { width:100%; height:80px; font-size:15px; padding:6px; border-radius:6px; border:1px solid #bbb; }
+#practiceResult { margin-top:8px; font-weight:bold; }
 </style>
 </head>
 <body>
@@ -65,6 +68,14 @@ th, td { border:1px solid #333; padding:6px 8px; text-align:center; font-size:14
 <p id="resultPronounce"></p>
 <p class="note">Ghi chú: có thể nhập URL ảnh hoặc để trống để tự lấy ảnh từ Unsplash.</p>
 
+<!-- Thực hành viết câu -->
+<div class="practice">
+  <h3>✍️ Thực hành viết câu với từ</h3>
+  <textarea id="practiceInput" placeholder="Viết một câu tiếng Anh sử dụng từ đang học..."></textarea>
+  <button onclick="checkSentence()">✅ Kiểm tra câu</button>
+  <div id="practiceResult"></div>
+</div>
+
 <!-- Danh sách từ -->
 <h3>Danh sách từ (Sửa / Xóa / Ảnh)</h3>
 <select id="filterCategory" onchange="renderTable()">
@@ -81,7 +92,7 @@ th, td { border:1px solid #333; padding:6px 8px; text-align:center; font-size:14
 // ==== Dữ liệu ====
 let words = JSON.parse(localStorage.getItem('words')) || [];
 let currentIndex = 0;
-let mode = "unknown"; // "unknown" = học từ chưa thuộc, "known" = ôn lại từ đã thuộc
+let mode = "unknown";
 
 const flashcard = document.getElementById('flashcard');
 const front = document.getElementById('front');
@@ -90,6 +101,8 @@ const wordTable = document.querySelector('#wordTable tbody');
 const filterCategory = document.getElementById('filterCategory');
 const speakBtn = document.getElementById('speakBtn');
 const resultPronounce = document.getElementById('resultPronounce');
+const practiceInput = document.getElementById('practiceInput');
+const practiceResult = document.getElementById('practiceResult');
 
 // ==== Hiển thị từ ====
 function getActiveWords(){
@@ -145,6 +158,41 @@ if('webkitSpeechRecognition' in window || 'SpeechRecognition' in window){
   };
 }
 speakBtn.addEventListener('click', ()=>{ if(recognition){ recognition.start(); resultPronounce.textContent="🎤 Đang nghe..."; } });
+
+// ==== Thực hành viết câu ====
+async function checkSentence(){
+  const active = getActiveWords(); if(active.length===0) return;
+  const w = active[currentIndex];
+  const sentence = practiceInput.value.trim();
+  if(!sentence) return alert("Viết một câu trước!");
+  
+  // Kiểm tra có dùng đúng từ không
+  if(!sentence.toLowerCase().includes(w.eng.toLowerCase())){
+    practiceResult.textContent = "❌ Bạn chưa dùng từ '" + w.eng + "'";
+    practiceResult.style.color = "red";
+    return;
+  }
+
+  // Gọi API LanguageTool để check ngữ pháp
+  try{
+    const res = await fetch("https://api.languagetool.org/v2/check", {
+      method: "POST",
+      headers: {"Content-Type": "application/x-www-form-urlencoded"},
+      body: new URLSearchParams({ text: sentence, language: "en-US" })
+    });
+    const data = await res.json();
+    if(data.matches.length===0){
+      practiceResult.textContent = "✅ Câu đúng, có dùng từ '" + w.eng + "'";
+      practiceResult.style.color = "green";
+    }else{
+      practiceResult.textContent = "⚠️ Có lỗi ngữ pháp: " + data.matches[0].message;
+      practiceResult.style.color = "orange";
+    }
+  }catch(err){
+    practiceResult.textContent = "Lỗi khi kiểm tra ngữ pháp.";
+    practiceResult.style.color = "red";
+  }
+}
 
 // ==== Thêm / Xóa / Sửa ====
 function addWord(){
